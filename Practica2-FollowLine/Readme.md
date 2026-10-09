@@ -101,12 +101,48 @@ https://github.com/user-attachments/assets/03842e09-dfcc-4f0a-98ce-a11bbd44b107
 Es sorprendente observar la diferencia de tiempo con el uso de ambos PIDs en lugar de usar unicamente uno.
 
 
+## Mejoras 
+
+En esta última versión hemos introducido una serie de mejoras sobre la implementación anterior con el objetivo de aumentar la velocidad del coche y mejorar la estabilidad durante el seguimiento de la línea roja, reduciendo las oscilaciones sin renunciar a un comportamiento rápido.
+
+1. `Modificación de la región de interés (ROI)`
+
+Antes calculábamos el centroide utilizando todos los píxeles rojos de la imagen mediante `cv2.moments(mask)`. Esto permitía considerar toda la línea visible, pero también hacía que el cálculo dependiera de los tramos que aparecían a diferentes distancias del vehículo.
+
+En esta versión mejorada hemos incorporado una región de interés (ROI) situada entre el 45 % y el 70 % de la altura de la imagen. De esta forma, el centroide se calcula exclusivamente a partir de la línea detectada dentro de esta franja. La finalidad es controlar el vehículo utilizando una región concreta de la imagen, dándonos más margen para anticiparse y maniobrar. 
+
+Además, hemos incorporado un rectángulo verde para visualizar la ROI.
+
+2. `Filtrado de la derivada del Direction PID`
+
+También hemos mejorado la derivada del Direction PID, ya que antes la calculabamos directamente mediante la diferencia entre el error actual y el anterior, pero ahora hemos incorporado un filtro de primer orden para suavizar sus variaciones.ç
+
+
+Esta modificación reduce la influencia de los cambios bruscos de la derivada entre iteraciones, lo que puede ayudar a disminuir las correcciones excesivas del volante. El filtrado también introduce cierto retraso, por lo que hemos tenido que comprobar su efecto con cuidado.
+
+
+3. `Limitación de la velocidad angular`
+
+Antes no imponíamos un límite explícito a la velocidad angular calculada por el PID. Pero, en esta nueva versión hemos establecido un rango de actuación.
+
+Con ello evitamos que el controlador genere órdenes angulares superiores a los límites establecidos. Esta medida permite controlar la intensidad máxima de las correcciones, aunque el límite lo hemos ajustado según el comportamiento observado en las curvas.
+
+4. `Modificación del control adaptativo de velocidad`
+
+Hemos reducido el coeficiente del factor de velocidad, de modo que la velocidad se reduce menos para un mismo error lateral. Por tanto, el coche conserva una mayor velocidad en las curvas cuando existe una desviación moderada respecto al centro de la imagen.
+
+
+
+
+
+Conclusión: El propósito de estas mejoras es conseguir un equilibrio entre velocidad, precisión y estabilidad. La efectividad de cada modificación debe evaluarse mediante pruebas en el simulador, comparando el tiempo por vuelta, las oscilaciones y las posibles salidas de trayectoria.
+
+
+
 ## Resultado final 
 
-Después de mucha prueba y error ajustando poco a poco cada PID llegamos a la conclusion de que hemos llegado al límite de esta implementación. El uso de unicamente dos PIDs no permite bajar más el tiempo por vuelta. Con más implementaciones y ajustes de control seguro que se puede bajar dicho tiempo pero con nuestra implementación el tiempo más bajo capturado por vuelta es de: `66-67s`
+[Grabación de pantalla desde 2026-10-09 11-53-45.webm](https://github.com/user-attachments/assets/90cf6984-08fb-46ee-9485-a9ef70005061)
 
-
-https://github.com/user-attachments/assets/50b83949-3b10-4455-bb53-c87527289835
 
 
 
