@@ -141,13 +141,103 @@ Finalmente aplicamos un control propocional (P) de foma que: si el robot está b
 
 De esta forma el código se repite hasta que llega al destino donde se detiene al detectar que ha llegado al final.
 
-## Conclusión 
 
-Nuestra solución cumple el enunciado porque generamos un campo de costes global usando una expansión tipo Dijkstra sobre la cuadrícula, asignando pesos adecuados y evitando obstáculos. Además, añadimos una penalización cerca de muros, tal como se solicita para prevenir colisiones. Por otro lado, durante la navegación, seleccionamos metas locales dentro de un radio seguro y finalmente, el robot avanza usando control lineal y angular hacia estos sub-objetivos, completando la planificación y navegación exigidas.
+<br>
+<br>
 
-## Vídeo Funcionamiento FINAL 
+## Mejoras 
 
-https://github.com/user-attachments/assets/503bbb39-c83c-4a72-91ec-eeb4d59bc863
+Una vez desarrollada la primera versión del algoritmo de planificación y navegación, hemos realizado una serie de mejoras con el objetivo de optimizar el funcionamiento del robot, reducir cálculos innecesarios, mejorar la seguridad de las trayectorias y conseguir una navegación más organizada y fluida. De esta forma vamos a explicar los principales cambios introducidos respecto a la implementación original:
+
+### 1. Optimización del cálculo de distancias 
+
+En la primera versión, la distancia a los obstáculos la calculábamos mediante `distance_transform_edt()` durante la ejecución del programa y la función `obstacle_penalty()` generaba el mapa de penalizaciones cada vez que se ejecutaba el bucle principal, pero como el mapa permanece estático durante la simulación, no necesitamos repetir estos cálculos continuamente. Por eso, hemos trasladado su calculo al inicio del programa:
+
+- `DIST_TO_OBSTACLE`: almacena la distancia de cada celda al obstáculo más cercano.
+
+- `safe_map`: identifica las celdas que cumplen el margen de seguridad establecido.
+
+- `PENALTY_MAP`: almacena las penalizaciones de las celdas próximas a los obstáculos.
+
+Además, hemos sustituido la función `obstacle_penalty()` por una operación directa, simplificando la generación del mapa de penalizaciones.
+
+<br>
+
+### 2. Centralización de parámetros y optimización del código
+
+Hemos agrupado al principio del programa los parámetros principales de planificación y navegación, así como los radios de seguridad, las penalizaciones, las ganancias del controlador y los límites de velocidad. También hemos definido `VECINOS` como una constante global, evitando reconstruir la lista de movimientos posibles cada vez que se ejecuta Dijkstra.
+
+<br>
+
+### 3. Visualización de la expansión de Dijkstra
+
+Hemos incorporado una animación a la función `wavefront()` para visualizar cómo se expande el algoritmo desde el destino seleccionado.Además, mediante un contador de celdas expandidas, actualizamos la imagen cada 500 celdas y añadimos una pequeña pausa de 0.08 segundos para poder observar el proceso.
+
+También hemos incorporado `mostrar_campo()`, que convierte los valores del campo de costes a una imagen en escala de grises de tipo uint8, adecuada para su representación mediante WebGUI.showNumpy().
+
+<br>
+
+### 4. Generación de una ruta completa mediante sub-destinos
+
+En la implementación original, el robot seleccionaba un sub-destino local y volvía a calcular el campo de costes continuamente durante la navegación, pero en nuestra versión final hemos incorporado `construir_ruta()`, que utiliza repetidamente `local_goal()` para generar una secuencia de puntos desde la posición inicial del robot hasta el destino final.
+
+<br>
+
+## 5. Suavizado de la trayectoria
+
+Una vez construida la ruta, hemos incorporado un procedimiento de suavizado que permite reducir los cambios de dirección innecesarios. Para ello, utilizamos  `linea_libre()`, que comprueba si existe una trayectoria recta entre dos puntos sin atravesar celdas penalizadas por su proximidad a los obstáculos. Posteriormente, dentro de `construir_ruta()`, buscamos conectar cada punto con el más lejano al que podemos llegar en línea recta.
+
+
+<br>
+
+## 6. Gestión de posiciones y destinos inseguros
+
+Hemos incorporado `celda_cercana()`, que permite localizar la celda libre o segura más próxima a una posición determinada. Esta función se utiliza en dos situaciones:
+
+- Si el robot se encuentra inicialmente sobre una celda considerada obstáculo, buscamos una celda transitable cercana desde la que comenzar la planificación.
+
+- Si el usuario selecciona un destino sobre un obstáculo o demasiado cerca de una pared, buscamos una celda que cumpla el margen de seguridad y planificamos hacia ella.
+
+Además, hemos marcado los bordes del mapa como obstáculos, evitando que el planificador considere estas zonas como transitables.
+
+
+
+<br>
+
+## 7. Mejora de la navegación y del control del robot
+
+También hemos reorganizado el sistema de navegación mediante las funciones `mover_hacia()`, `parar()` y `distancia()`. En la primera versión, el controlador calculaba la orientación deseada utilizando las coordenadas de la cuadrícula. Ahora utilizamos directamente la posición real del robot y las coordenadas del siguiente sub-destino en el mundo.
+
+Además, hemos incorporado dos mejoras. En primer lugar el seguimiento de sub-destinos donde el robot avanza por los distintos puntos de la ruta y pasa al siguiente cuando se encuentra a menos de 1.5 metros del actual. Y en segundo lugar el control de velocidad donde la velocidad lineal se limita teniendo en cuenta la distancia restante hasta el destino final, permitiendo reducirla al aproximarse a la meta.
+
+<br>
+
+## 8. Simplificación del bucle principal y gestión de destinos
+
+Por último, hemos simplificado el bucle principal para separar la planificación de la navegación sin necesidad de mantener una máquina de estados explícita. Lo conseguimos utilizando `ultimo_destino` para detectar cuándo el usuario selecciona un nuevo objetivo y `ruta` para controlar si existe una trayectoria pendiente de seguir.
+
+El funcionamiento queda organizado en tres situaciones:
+
+- `Sin destino`: el robot permanece detenido esperando una nueva selección.
+
+- `Nuevo destino`: el robot se detiene, calcula la ruta completa y reinicia el índice de seguimiento.
+
+- `Navegación`: sigue los sub-destinos calculados hasta alcanzar el objetivo final.
+
+Cuando el robot se encuentra a menos de 0.3 metros del destino, se detiene, vacía la ruta y vuelve a esperar una nueva selección. Además, si el usuario selecciona otro destino mientras el robot está navegando, se detiene y calcula una nueva trayectoria.
+
+
+<br>
+
+
+En conjunto, estas modificaciones permiten pasar de una planificación repetitiva basada en sub-destinos locales a un sistema que calcula una ruta completa antes de iniciar el movimiento, con una estructura más sencilla y organizada.
+
+## Video Funcionamiento FINAL
+
+
+https://github.com/user-attachments/assets/2cfa314e-feb0-4d6a-8878-ce5d12db92dc
+
+
 
 
 
