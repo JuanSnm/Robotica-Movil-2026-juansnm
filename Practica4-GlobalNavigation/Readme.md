@@ -177,15 +177,22 @@ También hemos incorporado `mostrar_campo()`, que convierte los valores del camp
 
 <br>
 
-### 4. Generación de una ruta completa mediante sub-destinos
+### 4. Optimización de la planificación 
 
-En la implementación original, el robot seleccionaba un sub-destino local y volvía a calcular el campo de costes continuamente durante la navegación, pero en nuestra versión final hemos incorporado `construir_ruta()`, que utiliza repetidamente `local_goal()` para generar una secuencia de puntos desde la posición inicial del robot hasta el destino final.
+En la implementación original, el campo de costes se recalculaba continuamente durante la navegación. En nuestra versión final, hemos cambiado este funcionamiento de forma que, el campo se calcula una única vez cuando el usuario selecciona un nuevo destino. Para ello, utilizamos planificar(), que obtiene la posición del robot y la del objetivo, comprueba que ambas sean válidas y ejecuta wavefront() para calcular el campo de costes.
+
+Una vez calculado, se añade el mapa de penalizaciones mediante PENALTY_MAP, obteniendo el campo que se utilizará para orientar la navegación hacia el destino. Si no existe un camino transitable, el programa informa de ello y no inicia la navegación.
 
 <br>
 
-## 5. Suavizado de la trayectoria
+## 5. Navegación por gradiente y selección de sub-destinos
 
-Una vez construida la ruta, hemos incorporado un procedimiento de suavizado que permite reducir los cambios de dirección innecesarios. Para ello, utilizamos  `linea_libre()`, que comprueba si existe una trayectoria recta entre dos puntos sin atravesar celdas penalizadas por su proximidad a los obstáculos. Posteriormente, dentro de `construir_ruta()`, buscamos conectar cada punto con el más lejano al que podemos llegar en línea recta.
+Hemos sustituido la generación de una ruta completa mediante una secuencia de puntos por un sistema de navegación basado directamente en el gradiente del campo de costes.
+
+Para ello, utilizamos `local_goal()`, que analiza una ventana de celdas alrededor de la posición actual del robot. Dentro de esta ventana, selecciona las celdas seguras ordenadas de menor a mayor coste, buscando avanzar hacia valores inferiores del campo. Además, hemos incorporado `linea_libre()`, que comprueba si existe una línea recta entre la posición actual y el posible sub-destino sin atravesar celdas penalizadas por su proximidad a los obstáculos.
+
+Por último la función `punto_gradiente()` coordina este proceso. Si el objetivo ya se encuentra dentro de la ventana de búsqueda, el robot se dirige directamente hacia él. En caso contrario, utiliza `local_goal()` para seleccionar el siguiente sub-destino.
+
 
 
 <br>
@@ -206,15 +213,17 @@ Además, hemos marcado los bordes del mapa como obstáculos, evitando que el pla
 
 ## 7. Mejora de la navegación y del control del robot
 
-También hemos reorganizado el sistema de navegación mediante las funciones `mover_hacia()`, `parar()` y `distancia()`. En la primera versión, el controlador calculaba la orientación deseada utilizando las coordenadas de la cuadrícula. Ahora utilizamos directamente la posición real del robot y las coordenadas del siguiente sub-destino en el mundo.
+También hemos reorganizado el sistema de control mediante las funciones `mover_hacia()`, `parar()` y `distancia()`.
 
-Además, hemos incorporado dos mejoras. En primer lugar el seguimiento de sub-destinos donde el robot avanza por los distintos puntos de la ruta y pasa al siguiente cuando se encuentra a menos de 1.5 metros del actual. Y en segundo lugar el control de velocidad donde la velocidad lineal se limita teniendo en cuenta la distancia restante hasta el destino final, permitiendo reducirla al aproximarse a la meta.
+Ahora calculamos la orientación deseada a partir de la posición real del robot y las coordenadas del siguiente sub-destino en el mundo. Para controlar el movimiento, utilizamos un controlador proporcional que calcula la velocidad angular en función del error de orientación. La velocidad lineal también depende de dicho error, reduciéndose cuando el robot necesita girar considerablemente.
+
+Por último, limitamos la velocidad lineal teniendo en cuenta la distancia restante hasta el destino final, permitiendo reducirla al aproximarse a la meta.
 
 <br>
 
 ## 8. Simplificación del bucle principal y gestión de destinos
 
-Por último, hemos simplificado el bucle principal para separar la planificación de la navegación sin necesidad de mantener una máquina de estados explícita. Lo conseguimos utilizando `ultimo_destino` para detectar cuándo el usuario selecciona un nuevo objetivo y `ruta` para controlar si existe una trayectoria pendiente de seguir.
+Por último, hemos simplificado el bucle principal para separar la planificación de la navegación sin necesidad de mantener una máquina de estados explícita. LUtilizamos `ultimo_clic` para detectar cuándo el usuario selecciona un nuevo destino y campo para controlar si existe una planificación activa.
 
 El funcionamiento queda organizado en tres situaciones:
 
@@ -235,7 +244,9 @@ En conjunto, estas modificaciones permiten pasar de una planificación repetitiv
 ## Video Funcionamiento FINAL
 
 
-https://github.com/user-attachments/assets/2cfa314e-feb0-4d6a-8878-ce5d12db92dc
+
+https://github.com/user-attachments/assets/76df6985-9c88-44bb-989b-e397d2e862d7
+
 
 
 
